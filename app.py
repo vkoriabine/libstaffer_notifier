@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from collections import defaultdict
 from flask import Flask, request, jsonify
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 
 API_KEY = os.environ.get("API_KEY", "")
 ICS_URL = os.environ.get("ICS_URL", "")
