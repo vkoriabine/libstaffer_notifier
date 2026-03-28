@@ -377,15 +377,19 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
 # --- Worker that processes tasks one at a time ---
 def worker():
     while True:
+        print("[worker]: awaiting task")
         task = task_queue.get()
         try:
+            print("[worker]: running task...")
             task()
+            print("[worker]: task completed")
         except Exception as e:
-            print(f"Error running task: {e}")
+            print(f"[worker]: error running task: {e}")
         finally:
             task_queue.task_done()
 
 # Start worker thread
+print("Starting worker thread")
 worker_thread = Thread(target=worker, daemon=True)
 worker_thread.start()
 watcher = ICSChangeWatcher()
@@ -396,6 +400,7 @@ def sync():
     # API key check
     key = request.headers.get("x-api-key")
     if key != API_KEY:
+        print("Unauthorized request")
         return jsonify({"status": "ignored"}), 401
 
     # Define the task
@@ -403,6 +408,7 @@ def sync():
         watcher.run_once()
 
     # Add to queue
+    print("Adding new task to queue")
     task_queue.put(task)
 
     return jsonify({"status": "queued"})
