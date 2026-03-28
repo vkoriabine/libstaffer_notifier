@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: libstaffer-notifier
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: API_KEY
+        sync: false
+      - key: ICS_URL
+        sync: false
+      - key: NTFY_URL
+        sync: false
+      - key: NTFY_TOPIC
+        sync: false
