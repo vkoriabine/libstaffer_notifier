@@ -24,6 +24,7 @@ ICS_URL = os.environ.get("ICS_URL", "")
 NTFY_URL = os.environ.get("NTFY_URL", "")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 REDIS_URL = os.environ.get("REDIS_URL", "")
+PORT = int(os.environ.get("PORT", 10000))
 
 STATE_KEY = "ics_change_watcher:state"
 SNAPSHOT_KEY = "ics_change_watcher:schedule_snapshot"
@@ -407,4 +408,4 @@ def sync():
     return jsonify({"status": "queued"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8085)
+    app.run(host="0.0.0.0", port=PORT)
