@@ -37,6 +37,9 @@ USER_AGENT = "ICS-Change-Watcher/2.0"
 app = Flask(__name__)
 task_queue = Queue()
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+watcher = ICSChangeWatcher()
+worker_started = False
+worker_lock = Lock()
 
 @dataclass
 class ICSState:
@@ -376,23 +379,31 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
 
 # --- Worker that processes tasks one at a time ---
 def worker():
+    print(f"Worker thread started in pid={os.getpid()}")
     while True:
-        print("[worker]: awaiting task")
+        print("Worker waiting for task...")
         task = task_queue.get()
+        print("Worker got task")
         try:
-            print("[worker]: running task...")
             task()
-            print("[worker]: task completed")
         except Exception as e:
-            print(f"[worker]: error running task: {e}")
+            print(f"Error running task: {e}")
         finally:
             task_queue.task_done()
 
-# Start worker thread
-print("Starting worker thread")
-worker_thread = Thread(target=worker, daemon=True)
-worker_thread.start()
-watcher = ICSChangeWatcher()
+def ensure_worker_started():
+    global worker_started
+    if not worker_started:
+        with worker_lock:
+            if not worker_started:
+                thread = Thread(target=worker, daemon=True)
+                thread.start()
+                worker_started = True
+
+
+@app.before_request
+def before_request():
+    ensure_worker_started()
 
 # --- API endpoint ---
 @app.route("/sync", methods=["POST"])
@@ -412,6 +423,11 @@ def sync():
     task_queue.put(task)
 
     return jsonify({"status": "queued"})
+
+@app.route("/", methods=["GET"])
+def health():
+    ensure_worker_started()
+    return "ok", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)
