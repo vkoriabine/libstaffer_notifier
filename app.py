@@ -292,7 +292,7 @@ def parse_event(event):
     person = re.sub(r'\d+', '', event.get("location")).strip()
     parsed = event.copy()
     parsed["unfilled"] = unfilled
-    parsed["name"] = name
+    parsed["name"] = name or "unnamed"
     parsed["person"] = person
     parsed["range"] = format_range(event.get('dtstart'), event.get('dtend'))
     return parsed
