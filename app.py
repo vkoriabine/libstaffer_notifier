@@ -30,7 +30,6 @@ SNAPSHOT_KEY = "ics_change_watcher:schedule_snapshot"
 
 EASTERN = ZoneInfo("America/New_York")
 
-STATE_FILE = Path("ics_change_watcher_state.json")
 TIMEOUT_SECONDS = 30
 USER_AGENT = "ICS-Change-Watcher/2.0"
 
