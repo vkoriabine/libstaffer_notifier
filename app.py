@@ -37,7 +37,6 @@ USER_AGENT = "ICS-Change-Watcher/2.0"
 app = Flask(__name__)
 task_queue = Queue()
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-watcher = ICSChangeWatcher()
 worker_started = False
 worker_lock = Lock()
 
@@ -416,6 +415,7 @@ def sync():
 
     # Define the task
     def task():
+        watcher = ICSChangeWatcher()
         watcher.run_once()
 
     # Add to queue
