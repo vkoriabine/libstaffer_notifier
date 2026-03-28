@@ -308,9 +308,9 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
         return (e.get("name"), e.get("range"))
 
     def format_event(e):
-        base = f"**{e.get('name')}** on {e.get('range')}"
+        base = f"{e.get('name')} on {e.get('range')}"
         if e.get("person"):
-            base += f"\nassigned to **{e.get('person')}**"
+            base += f"\nassigned to {e.get('person')}"
         return base
 
     # Group events by (name, range)
