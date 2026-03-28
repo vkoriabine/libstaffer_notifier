@@ -103,8 +103,7 @@ class ICSChangeWatcher:
         url = f"{NTFY_URL.rstrip('/')}/{NTFY_TOPIC}"
         headers = {
             "Title": title,
-            "Priority": "high",
-            "Tags": "books"
+            "Tags": "calendar"
         }
 
         response = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=TIMEOUT_SECONDS)
@@ -211,7 +210,7 @@ class ICSChangeWatcher:
             if extra > 0:
                 message += f"\n\n...and {extra} more change(s)."
 
-            self._notify(f"{len(diff_messages)} schedule change(s)", message)
+            self._notify(f"LibStaffer Update", message)
         else:
             print("No schedule change detected.")
 
@@ -269,14 +268,19 @@ def format_range(start_value, end_value):
     now_et = datetime.now(EASTERN)
 
     if start_dt.date() == end_dt.date():
-        start_time = start_dt.strftime("%I:%M").lstrip("0")
+        start_ampm = start_dt.strftime("%p")
+        end_ampm = end_dt.strftime("%p")
+
+        if start_ampm == end_ampm:
+            start_time = start_dt.strftime("%I:%M").lstrip("0")
+        else:
+            start_time = start_dt.strftime("%I:%M %p").lstrip("0")
+
         end_time = end_dt.strftime("%I:%M %p").lstrip("0")
 
-        # Today: "3:30–4:15 PM"
         if start_dt.date() == now_et.date():
             return f"{start_time}–{end_time}"
 
-        # Same year: "May 31 10:00–11:00 AM"
         if start_dt.year == now_et.year:
             day = start_dt.strftime("%b %d").replace(" 0", " ")
             return f"{day} {start_time}–{end_time}"
@@ -306,12 +310,6 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
 
     def key(e):
         return (e.get("name"), e.get("range"))
-
-    def format_event(e):
-        base = f"{e.get('name')} on {e.get('range')}"
-        if e.get("person"):
-            base += f"\nassigned to {e.get('person')}"
-        return base
 
     # Group events by (name, range)
     old_map = defaultdict(list)
@@ -354,25 +352,15 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
                     continue
 
                 if o.get("unfilled") and not n.get("unfilled"):
-                    messages.append(f"{n.get('person')} assigned to {o.get('name')}\non {o.get('range')}")
+                    messages.append(f"SHIFT CLAIMED\n{o.get('name')} @ {o.get('range')}\nAdded: {n.get('person')}")
                 if not o.get("unfilled") and n.get("unfilled"):
-                    messages.append(f"{o.get('person')} unassigned from {o.get('name')}\non {o.get('range')}")
+                    messages.append(f"SHIFT DROPPED\n{o.get('name')} @ {o.get('range')}\nRemoved: {o.get('person')}")
                 if not o.get("unfilled") and not n.get("unfilled"):
-                    messages.append(f"{n.get('person')} reassigned to {o.get('name')}\non {o.get('range')}\npreviously assigned to {o.get('person')}")
+                    messages.append(f"SHIFT REASSIGNED\n{o.get('name')} @ {o.get('range')}\nAdded: {n.get('person')}\nRemoved: {o.get('person')}")
 
                 matched_old[i] = True
                 matched_new[j] = True
                 break
-
-        # Step 3: leftovers → removed
-        for i, o in enumerate(old_list):
-            if not matched_old[i]:
-                messages.append(f"Event Removed:\n{format_event(o)}")
-
-        # Step 4: leftovers → added
-        for j, n in enumerate(new_list):
-            if not matched_new[j]:
-                messages.append(f"Event Added:\n{format_event(n)}")
 
     return messages
 
