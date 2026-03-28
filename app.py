@@ -5,6 +5,7 @@ import smtplib
 import sys
 import time
 import re
+import redis
 from dataclasses import dataclass, asdict
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -22,6 +23,10 @@ API_KEY = os.environ.get("API_KEY", "")
 ICS_URL = os.environ.get("ICS_URL", "")
 NTFY_URL = os.environ.get("NTFY_URL", "")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
+REDIS_URL = os.environ.get("REDIS_URL", "")
+
+STATE_KEY = "ics_change_watcher:state"
+SNAPSHOT_KEY = "ics_change_watcher:schedule_snapshot"
 
 EASTERN = ZoneInfo("America/New_York")
 
@@ -31,6 +36,7 @@ USER_AGENT = "ICS-Change-Watcher/2.0"
 
 app = Flask(__name__)
 task_queue = Queue()
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 @dataclass
 class ICSState:
@@ -47,17 +53,22 @@ class ICSChangeWatcher:
         self.state = self._load_state()
 
     def _load_state(self) -> ICSState:
-        if STATE_FILE.exists():
+        raw = redis_client.get(STATE_KEY)
+        if raw:
             try:
-                data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+                data = json.loads(raw)
                 if data.get("url") == ICS_URL:
                     return ICSState(**data)
             except Exception:
                 pass
         return ICSState(url=ICS_URL)
 
+
     def _save_state(self) -> None:
-        STATE_FILE.write_text(json.dumps(asdict(self.state), indent=2), encoding="utf-8")
+        redis_client.set(
+            STATE_KEY,
+            json.dumps(asdict(self.state), indent=2, ensure_ascii=False),
+        )
 
     def _request_response(self) -> requests.Response:
         headers = {"User-Agent": USER_AGENT}
@@ -111,8 +122,6 @@ class ICSChangeWatcher:
 
     def check_once(self) -> bool:
 
-        snapshot_file = Path("ics_change_watcher_schedule_snapshot.json")
-
         def normalize_ical_value(value):
             if value is None:
                 return None
@@ -165,18 +174,19 @@ class ICSChangeWatcher:
         new_events = build_event_snapshot(ics_bytes)
 
         old_events: dict[str, dict] = {}
-        if snapshot_file.exists():
+        raw_snapshot = redis_client.get(SNAPSHOT_KEY)
+        if raw_snapshot:
             try:
-                old_events = json.loads(snapshot_file.read_text(encoding="utf-8"))
+                old_events = json.loads(raw_snapshot)
             except Exception:
                 old_events = {}
 
         diff_messages = summarize_differences(old_events, new_events)
         changed = len(diff_messages) > 0
 
-        snapshot_file.write_text(
+        redis_client.set(
+            SNAPSHOT_KEY,
             json.dumps(new_events, indent=2, ensure_ascii=False),
-            encoding="utf-8",
         )
 
         self.state.etag = new_etag

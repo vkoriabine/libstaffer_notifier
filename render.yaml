@@ -13,3 +13,5 @@ services:
         sync: false
       - key: NTFY_TOPIC
         sync: false
+      - key: REDIS_URL
+        sync: false
