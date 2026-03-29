@@ -293,11 +293,13 @@ def format_range(start_value, end_value):
 def parse_event(event):
     unfilled = "(Unfilled)" in event.get("summary")
     name = event.get("summary").replace("(Unfilled)", "").strip()
-    person = re.sub(r'\d+', '', event.get("location")).strip()
+    people = re.sub(r'[\d\\]+', '', event.get("location")).strip()
+    people_list = [x.strip() for x in people.split(',')]
+    people_list.sort()
     parsed = event.copy()
     parsed["unfilled"] = unfilled
     parsed["name"] = name or "unnamed"
-    parsed["person"] = person
+    parsed["people"] = people_list
     parsed["range"] = format_range(event.get('dtstart'), event.get('dtend'))
     return parsed
 
@@ -330,20 +332,20 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
         matched_old = [False] * len(old_list)
         matched_new = [False] * len(new_list)
 
-        # Step 1: match identical events (same person + unfilled)
+        # Step 1: match identical events (same people + unfilled)
         for i, o in enumerate(old_list):
             for j, n in enumerate(new_list):
                 if matched_new[j]:
                     continue
                 if (
-                    o.get("person") == n.get("person")
+                    o.get("people") == n.get("people")
                     and o.get("unfilled") == n.get("unfilled")
                 ):
                     matched_old[i] = True
                     matched_new[j] = True
                     break
 
-        # Step 2: match "changed" events (same name+range, different person/unfilled)
+        # Step 2: match "changed" events (same name+range, different people/unfilled)
         for i, o in enumerate(old_list):
             if matched_old[i]:
                 continue
@@ -351,12 +353,26 @@ def summarize_differences(old_events_dict: dict, new_events_dict: dict) -> list[
                 if matched_new[j]:
                     continue
 
-                if o.get("unfilled") and not n.get("unfilled"):
-                    messages.append(f"SHIFT CLAIMED\n{o.get('name')} @ {o.get('range')}\nAdded: {n.get('person')}")
-                if not o.get("unfilled") and n.get("unfilled"):
-                    messages.append(f"SHIFT DROPPED\n{o.get('name')} @ {o.get('range')}\nRemoved: {o.get('person')}")
-                if not o.get("unfilled") and not n.get("unfilled"):
-                    messages.append(f"SHIFT REASSIGNED\n{o.get('name')} @ {o.get('range')}\nAdded: {n.get('person')}\nRemoved: {o.get('person')}")
+                o_people = o.get('people')
+                n_people = n.get('people')
+                o_people_set = set(o_people)
+                n_people_set = set(n_people)
+                added = list(n_people_set - o_people_set)
+                removed = list(o_people_set - n_people_set)
+                added.sort()
+                removed.sort()
+
+                shift_name = f"{o.get('name')} @ {o.get('range')}"
+                addendum = ""
+                if n.get("unfilled"):
+                    addendum = "\n(this shift is not fully filled)"
+
+                if added and not removed:
+                    messages.append(f"SHIFT CLAIMED\n{shift_name}\nAdded: {", ".join(added)}{addendum}")
+                elif not added and removed:
+                    messages.append(f"SHIFT DROPPED\n{shift_name}\nRemoved: {", ".join(removed)}")
+                elif added and removed:
+                    messages.append(f"SHIFT REASSIGNED\n{shift_name}\nAdded: {", ".join(added)}\nRemoved: {", ".join(removed)}{addendum}")
 
                 matched_old[i] = True
                 matched_new[j] = True
