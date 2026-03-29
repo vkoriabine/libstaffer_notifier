@@ -294,7 +294,7 @@ def parse_event(event):
     unfilled = "(Unfilled)" in event.get("summary")
     name = event.get("summary").replace("(Unfilled)", "").strip()
     people = re.sub(r'[\d\\]+', '', event.get("location")).strip()
-    people_list = [x.strip() for x in people.split(',') if x]
+    people_list = [x.strip() for x in people.split(',') if x.strip()]
     people_list.sort()
     parsed = event.copy()
     parsed["unfilled"] = unfilled
